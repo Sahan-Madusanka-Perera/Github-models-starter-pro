@@ -20,6 +20,8 @@
  *    - Store conversation history to preserve context across exchanges
  *    - Handle user input and AI responses in a continuous dialogue
  * 
+
+ * 
  * 3. Coding Assistance Features:
  *    - Provide meaningful coding guidance based on user queries
  *    - Support various programming languages and concepts
@@ -54,3 +56,91 @@
 // Example:
 // User: "How do I create a function in JavaScript?"
 // Bot: "You can create a function using the `function` keyword or as an arrow function. Here's an example: ..."
+
+import OpenAI from "openai";
+import dotenv from "dotenv";
+import readline from "readline";
+
+// Step 1: Load environment variables
+dotenv.config();
+
+// Step 2: Initialize the OpenAI API client with GitHub token authentication
+const token = process.env["GITHUB_TOKEN"];
+const endpoint = "https://models.github.ai/inference";
+const modelName = "openai/gpt-4o";
+
+async function main() {
+  // Initialize OpenAI client pointing to GitHub's AI inference service
+  const client = new OpenAI({ baseURL: endpoint, apiKey: token });
+
+  // Set up readline for interactive command-line input
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  // Step 3: Initialize conversation history with a coding-focused system prompt
+  let messages = [
+    {
+      role: "system",
+      content:
+        "You are an expert coding assistant. You help developers with programming questions, " +
+        "debugging, code reviews, and best practices across a wide range of languages and frameworks. " +
+        "When providing code examples, use clear formatting and explain the key concepts. " +
+        "If asked to debug code, ask for the code and error message if not already provided. " +
+        "Always aim for accurate, concise, and practical guidance."+
+        "You should focus on giving instructions and explanations that are actionable and easy to understand. " +
+        "If the user asks for code examples, provide them in a clear and well-formatted manner. " +
+        "If the user asks for debugging help, ask for the code and error message if not already provided. " +
+        "Always aim to provide accurate, concise, and practical guidance."
+    },
+  ];
+
+  // Step 4: Implement multi-turn conversation loop
+  async function chatLoop() {
+    rl.question("You: ", async (input) => {
+      const trimmed = input.trim();
+
+      // Allow graceful exit
+      if (trimmed.toLowerCase() === "exit") {
+        console.log("Goodbye! Have a nice day! Happy coding Yooo!");
+        rl.close();
+        return;
+      }
+
+      // Skip empty input
+      if (!trimmed) {
+        chatLoop();
+        return;
+      }
+
+      // Add user message to conversation history
+      messages.push({ role: "user", content: trimmed });
+
+      try {
+        // Send full conversation history to maintain context across turns
+        const response = await client.chat.completions.create({
+          messages,
+          model: modelName,
+        });
+
+        const reply = response.choices[0].message.content;
+        console.log("\nAssistant:", reply, "\n");
+
+        // Add assistant reply to history for future context
+        messages.push({ role: "assistant", content: reply });
+      } catch (error) {
+        console.error("Error communicating with the API:", error.message);
+      }
+
+      // Continue the conversation
+      chatLoop();
+    });
+  }
+
+  console.log("=== Coding Assistant Chatbot ===");
+  console.log('Ask me anything about coding! Type "exit" to quit.\n');
+  chatLoop();
+}
+
+main();
